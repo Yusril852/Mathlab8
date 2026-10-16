@@ -314,7 +314,8 @@ function body(q,a,ans,ex){const done=a!=null,bd=ok=>`2px solid ${done&&!ex?(ok?'
  return q.pilihan.map((o,j)=>`<button class="opt ${ans?(o==q.jawaban?'ok':j==a?'no':''):a==j?'sel':''}" onclick="pick(${j})">${'ABCD'[j]}. ${o}</button>`).join('')}
 function subN(){const v=$('#nv').value.trim();if(v==''||isNaN(num(v)))return toast('Isi dengan angka dulu ya');pick(v)}
 function subM(){const v=P.qs[P.i].pairs.map((p,i)=>$('#mt'+i).value);if(v.includes(''))return toast('Pasangkan semua dulu ya');pick(v)}
-let T={ok:false,sel:null,cf:null,det:undefined,err:0},LIVE={},PRS={},GF={s:'ALL',g:'ALL',q:''},unw=null,gT=0,gLast='',gFilKey='';
+const ADMIN='ysril852@gmail.com';
+let T={ok:false,adm:false,kl:false,sel:null,cf:null,det:undefined,err:0},LIVE={},PRS={},GF={s:'ALL',g:'ALL',q:''},unw=null,gT=0,gLast='',gFilKey='';
 const fd=t=>t?new Date(t).toLocaleDateString('id-ID',{day:'numeric',month:'short'}):'–',
 sAcc=(u,f)=>{const a=u.att.filter(f);return a.length?Math.round(a.filter(x=>x.ok).length/a.length*100):null},
 dot=a=>a==null?'⚪':a<60?'🔴':a<75?'🟡':a<90?'🟢':'🏆',pc=a=>a==null?'–':a+'%',lastT=u=>u.att.length?u.att[u.att.length-1].t:0,
@@ -327,16 +328,16 @@ const ringkas=u=>{const bab=B.map((b,i)=>{const a=u.att.filter(x=>x.k.startsWith
 const fromR=(k,v)=>{if(!v||!v.name)return null;const ba=arr(v.bab),sub={};Object.entries(v.sub||{}).forEach(([x,y])=>{const z=arr(y).map(Number);sub[x]=[z[0]||0,z[1]||0]});return{...v,id:k,bab:B.map((b,i)=>{const z=arr(ba[i]).map(Number);return[z[0]||0,z[1]||0]}),sub,tot:+v.tot||0,ok:+v.ok||0,xp:+v.xp||0,lastAtt:+v.lastAtt||0,lastActive:+v.lastActive||0,lastDay:v.lastDay||''}};
 const sha=async s=>{try{if(crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mathlab8:'+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}}catch(e){}return'p:'+s};
 async function pinH(){let h=null;if(hasFB()){try{h=await tmo(FB.getPin(),5000)}catch(e){}}return h||DB.root().pinHash||await sha('123456')}
-async function gLogin(){if(await sha($('#gp').value)!=await pinH())return toast('PIN salah');T.ok=true;T.sel=null;startWatch();go('guru')}
+async function gLogin(){const em=($('#ge').value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(em))return toast('Isi email guru dengan benar');if(await sha($('#gp').value)!=await pinH())return toast('PIN salah');T.ok=true;T.adm=em===ADMIN;T.kl=false;T.sel=null;startWatch();go('guru')}
 async function loadDet(id){let d=null;T.err=0;try{if(hasFB())d=fromCloud(await tmo(FB.get(id),8000));else{const l=DB.root().users[id];d=l?fromCloud(l):null}}catch(e){d=null;T.err=1}
  if(T.sel!=id)return;T.det=d?{...d,id}:null;gLast=JSON.stringify(LIVE[id]||{});if(V=='guru')render()}
-function gOpen(id){T.sel=id;T.cf=null;T.det=undefined;gLast=JSON.stringify(LIVE[id]||{});go('guru');loadDet(id)}
-function gExit(){T.ok=false;T.sel=null;T.cf=null;stopWatch();go('landing')}
-async function gAct(a){const id=T.sel,u=LIVE[id];if(!u)return;if(T.cf!=a){T.cf=a;render();return}
+function gOpen(id){T.sel=id;T.kl=false;T.cf=null;T.det=undefined;gLast=JSON.stringify(LIVE[id]||{});go('guru');loadDet(id)}
+function gExit(){T.ok=false;T.adm=false;T.kl=false;T.sel=null;T.cf=null;stopWatch();go('landing')}
+async function gAct(a){if(!T.adm)return;const id=T.sel,u=LIVE[id];if(!u)return;if(T.cf!=a){T.cf=a;render();return}
  const z={...blank(u.name,u.school,u.grade),id,lastActive:Date.now()};
  if(hasFB()){try{await tmo(a=='reset'?FB.put(id,toCloud(z),ringkas(z)):FB.del(id),6000)}catch(e){toast('Gagal menghubungi cloud');T.cf=null;render();return}}
  R=DB.root();if(a=='reset'){if(R.users[id])R.users[id]=z}else{delete R.users[id];R.recent=(R.recent||[]).filter(x=>x.id!=id)}DB.put(R);
- if(a=='del'){T.sel=null;T.det=undefined}else T.det=z;T.cf=null;toast(a=='reset'?'Progress direset':'Siswa dihapus');startWatch();render()}
+ if(a=='del'){T.sel=null;T.kl=false;T.det=undefined}else T.det=z;T.cf=null;toast(a=='reset'?'Progress direset':'Siswa dihapus');startWatch();render()}
 async function gPin(){const v=$('#np').value.trim();if(v.length<4)return toast('PIN minimal 4 karakter');const h=await sha(v);
  if(hasFB()){try{await tmo(FB.setPin(h),6000)}catch(e){return toast('Gagal menyimpan PIN ke cloud')}}
  R=DB.root();R.pinHash=h;DB.put(R);toast('PIN diubah');$('#np').value=''}
@@ -369,7 +370,7 @@ function gbody(){const us=gList();if(!us.length)return`<div class=card style="ma
 const bar=p=>`<div class="bar"><i style="width:${p}%"></i></div>`;
 function acc(f){const a=S.att.filter(f);return a.length?Math.round(a.filter(x=>x.ok).length/a.length*100):0}
 const views={
-glogin(){return`<div class=card><h2 style="margin-top:0">🔒 Dashboard Guru</h2><p class=mu>Masukkan PIN guru untuk memantau semua siswa secara realtime.</p><input id=gp class=inp type=password autocomplete=off placeholder="PIN" onkeydown="if(event.key=='Enter')gLogin()"><button class=btn onclick="gLogin()">Masuk</button></div>`},
+glogin(){return`<div class=card><h2 style="margin-top:0">🔒 Dashboard Guru</h2><p class=mu>Masukkan email dan PIN guru untuk memantau semua siswa secara realtime.</p><input id=ge class=inp type=email autocomplete=email placeholder="Email guru" onkeydown="if(event.key=='Enter')gLogin()"><input id=gp class=inp type=password autocomplete=off placeholder="PIN" onkeydown="if(event.key=='Enter')gLogin()"><button class=btn onclick="gLogin()">Masuk</button></div>`},
 guru(){if(!T.ok)return views.glogin();if(T.sel){const bk=`<button class="btn s" onclick="T.sel=null;go('guru')">← Semua siswa</button>`;if(T.det===undefined)return bk+'<p class=mu style="margin-top:14px">⏳ Memuat detail siswa…</p>';if(!T.det)return bk+`<p class=mu style="margin-top:14px">${T.err?'Gagal menghubungi cloud.':'Data detail siswa tidak ditemukan.'}</p>`;return views.gdetail(T.det)}
  return`<h1>Dashboard Guru</h1><p class=mu>${hasFB()?'Data realtime dari cloud. 🟢 = siswa sedang membuka aplikasi.':'Mode lokal: hanya data di perangkat ini. Isi config Firebase agar semua siswa muncul.'}</p><div class=card id=gfil>${gfil()}</div><input id=gq class=inp placeholder="Cari nama siswa…" value="${esc(GF.q)}" oninput="GF.q=this.value;gUp()" style="margin-top:12px"><div id=gbody>${gbody()}</div>
  <h2>Ubah PIN guru</h2><div class=card><p class=mu style="margin-top:0">PIN awal 123456, segera ganti. PIN hanya pengaman tampilan; keamanan data sebenarnya lewat Firebase Rules.</p><input id=np class=inp type=password autocomplete=off placeholder="PIN baru (min. 4 karakter)"><button class=btn onclick="gPin()">Simpan PIN</button></div>`},
@@ -382,7 +383,7 @@ gdetail(u){const subs=B.flatMap((b,i)=>b.s.map((s,j)=>{const k=i+'.'+j;return{k,
  <h2>Soal yang sering salah</h2>${(()=>{const w={};u.att.forEach(x=>{const o=w[x.qid]=w[x.qid]||[0,0];o[1]++;if(!x.ok)o[0]++});const t=Object.entries(w).filter(e=>e[1][0]>=1).sort((p,q)=>q[1][0]-p[1][0]||q[1][0]/q[1][1]-p[1][0]/p[1][1]).slice(0,8).map(([id,v])=>{const q=findQ(id);return q?`<div class=card><div class=mu>${esc(q.subBab)} · Level ${q.level}${q.gambar?' · bergambar':''}</div><div>${esc(q.pertanyaan.length>130?q.pertanyaan.slice(0,130)+'…':q.pertanyaan)}</div><b>${v[0]}× salah</b> dari ${v[1]} percobaan${u.wrong.includes(id)?' <span class=mu>· belum diulang benar</span>':''}</div>`:''}).join('');return t||'<p class=mu>Belum ada soal yang salah.</p>'})()}
  <h2>Rincian per sub-bab</h2><div class="card tw">${done.length?`<table><tr><th>Sub-bab</th><th>Soal</th><th>Akurasi</th><th>Terbaik L1/L2/L3</th></tr>${done.map(x=>`<tr><td>${dot(x.a)} ${x.s}<br><span class=mu>Bab ${x.b+1}</span></td><td>${x.n}</td><td>${pc(x.a)}</td><td>${x.L.map(v=>v==null?'–':v+'%').join(' / ')}</td></tr>`).join('')}</table>`:'<span class=mu>Belum ada soal yang dikerjakan.</span>'}</div>
  <h2>Riwayat ulangan</h2><div class=card>${u.res.length?u.res.slice(-5).reverse().map(r=>`<div class="row sp" style="margin:6px 0"><span>${fd(r.t)} · ${r.n} soal</span><b>${r.sc}%</b></div>`).join(''):'<span class=mu>Belum mengikuti ulangan.</span>'}</div>
- <div class=row style="margin-top:16px"><button class="btn s" onclick="gAct('reset')">${T.cf=='reset'?'Yakin reset? Klik lagi':'Reset progress'}</button><button class="btn s" onclick="gAct('del')">${T.cf=='del'?'Yakin hapus? Klik lagi':'Hapus siswa'}</button></div>`},
+ ${T.adm?`<div class=row style="margin-top:16px"><button class="btn s" onclick="T.kl=!T.kl;T.cf=null;render()">⚙️ Kelola</button></div>${T.kl?`<div class=card style="margin-top:12px;border:2px dashed #e5484d"><h3 style="margin-top:0">⚙️ Kelola data siswa</h3><p class=mu>Reset atau hapus data siswa ini. Progres, ringkasan, dan status online ikut terhapus. Tidak bisa dibatalkan. Jika siswa masih membuka aplikasi, datanya bisa muncul lagi.</p><div class=row><button class="btn s" onclick="gAct('reset')">${T.cf=='reset'?'Yakin reset? Klik lagi':'Reset progress'}</button><button class="btn s" onclick="gAct('del')">${T.cf=='del'?'Yakin hapus? Klik lagi':'🗑️ Hapus siswa'}</button></div></div>`:''}`:''}`},
 landing(){const rc=R.recent||[],SC=['SMP Negeri 3 Kaliwungu','SMP IT Robbani'],last=rc[0],cu=last&&!SC.includes(last.school);
  return`<div class=by><span id=cs>${CST[CS]}</span></div><div class=hero><div><h1>Math<span style="opacity:.8">Lab</span> VIII</h1><p>Latihan Matematika SMP kelas 8: bilangan berpangkat, Pythagoras, PLSV, fungsi, garis lurus, dan statistika.</p></div><div class=lvbadge>1.425<small>soal latihan</small></div></div>
  <div class=card style="margin-top:14px"><h2 style="margin-top:0">Masuk dan lanjutkan belajar</h2><p class=mu>Tanpa password. Pakai sekolah, kelas, dan nama yang sama setiap masuk. Progress tersimpan di cloud, jadi bisa dilanjutkan dari perangkat mana pun.</p>
