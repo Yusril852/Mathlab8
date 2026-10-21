@@ -328,14 +328,18 @@ const ringkas=u=>{const bab=B.map((b,i)=>{const a=u.att.filter(x=>x.k.startsWith
 const fromR=(k,v)=>{if(!v||!v.name)return null;const ba=arr(v.bab),sub={};Object.entries(v.sub||{}).forEach(([x,y])=>{const z=arr(y).map(Number);sub[x]=[z[0]||0,z[1]||0]});return{...v,id:k,bab:B.map((b,i)=>{const z=arr(ba[i]).map(Number);return[z[0]||0,z[1]||0]}),sub,tot:+v.tot||0,ok:+v.ok||0,xp:+v.xp||0,lastAtt:+v.lastAtt||0,lastActive:+v.lastActive||0,lastDay:v.lastDay||''}};
 const sha=async s=>{try{if(crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('mathlab8:'+s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}}catch(e){}return'p:'+s};
 async function pinH(){let h=null;if(hasFB()){try{h=await tmo(FB.getPin(),5000)}catch(e){}}return h||DB.root().pinHash||await sha('123456')}
-async function gLogin(){const em=($('#ge').value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(em))return toast('Isi email guru dengan benar');if(await sha($('#gp').value)!=await pinH())return toast('PIN salah');T.ok=true;T.adm=em===ADMIN;T.kl=false;T.sel=null;startWatch();go('guru')}
+async function gLogin(){const em=($('#ge').value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(em))return toast('Isi email guru dengan benar');
+ const pw=$('#gp').value,okPin=(await sha(pw))==(await pinH());let adm=false,ok=okPin;
+ if(em===ADMIN&&hasFB()&&FB.adminLogin){toast('Memverifikasi admin…');try{adm=(await FB.adminLogin(em,pw,okPin))===ADMIN;if(adm)ok=true;else{try{await FB.signOut()}catch(_){}toast('Akun yang dipakai bukan '+ADMIN)}}catch(e){if(okPin)toast('Login admin gagal ('+((e&&e.code)||'error')+')')}}
+ if(!ok)return toast('PIN salah');
+ T.ok=true;T.adm=adm;T.kl=false;T.sel=null;startWatch();go('guru')}
 async function loadDet(id){let d=null;T.err=0;try{if(hasFB())d=fromCloud(await tmo(FB.get(id),8000));else{const l=DB.root().users[id];d=l?fromCloud(l):null}}catch(e){d=null;T.err=1}
  if(T.sel!=id)return;T.det=d?{...d,id}:null;gLast=JSON.stringify(LIVE[id]||{});if(V=='guru')render()}
 function gOpen(id){T.sel=id;T.kl=false;T.cf=null;T.det=undefined;gLast=JSON.stringify(LIVE[id]||{});go('guru');loadDet(id)}
-function gExit(){T.ok=false;T.adm=false;T.kl=false;T.sel=null;T.cf=null;stopWatch();go('landing')}
+function gExit(){try{hasFB()&&FB.signOut&&FB.signOut()}catch(e){}T.ok=false;T.adm=false;T.kl=false;T.sel=null;T.cf=null;stopWatch();go('landing')}
 async function gAct(a){if(!T.adm)return;const id=T.sel,u=LIVE[id];if(!u)return;if(T.cf!=a){T.cf=a;render();return}
  const z={...blank(u.name,u.school,u.grade),id,lastActive:Date.now()};
- if(hasFB()){try{await tmo(a=='reset'?FB.put(id,toCloud(z),ringkas(z)):FB.del(id),6000)}catch(e){toast('Gagal menghubungi cloud');T.cf=null;render();return}}
+ if(hasFB()){try{await tmo(a=='reset'?FB.put(id,toCloud(z),ringkas(z)):FB.del(id),6000)}catch(e){toast('Gagal ('+((e&&e.code)||'cloud')+'). Pastikan login admin dan rules sudah dipublish');T.cf=null;render();return}}
  R=DB.root();if(a=='reset'){if(R.users[id])R.users[id]=z}else{delete R.users[id];R.recent=(R.recent||[]).filter(x=>x.id!=id)}DB.put(R);
  if(a=='del'){T.sel=null;T.kl=false;T.det=undefined}else T.det=z;T.cf=null;toast(a=='reset'?'Progress direset':'Siswa dihapus');startWatch();render()}
 async function gPin(){const v=$('#np').value.trim();if(v.length<4)return toast('PIN minimal 4 karakter');const h=await sha(v);
@@ -464,14 +468,16 @@ const firebaseConfig={
 const ROOT='mathlab8',FB={ok:false};window.FB=FB;
 if(!/YOUR_/.test(firebaseConfig.apiKey+firebaseConfig.databaseURL)){
  try{
-  const V='10.12.5',[A,D]=await Promise.all([import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),import(`https://www.gstatic.com/firebasejs/${V}/firebase-database.js`)]);
-  const db=D.getDatabase(A.initializeApp(firebaseConfig)),{ref,set,get,remove,update,onValue,onDisconnect,serverTimestamp,query,orderByChild,limitToLast}=D;let un=null,cur=null;
+  const V='10.12.5',[A,D,AU]=await Promise.all([import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),import(`https://www.gstatic.com/firebasejs/${V}/firebase-database.js`),import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`).catch(()=>null)]);
+  const app=A.initializeApp(firebaseConfig),db=D.getDatabase(app),auth=AU?AU.getAuth(app):null,{ref,set,get,remove,update,onValue,onDisconnect,serverTimestamp,query,orderByChild,limitToLast}=D;let un=null,cur=null;
   FB.get=async id=>(await get(ref(db,ROOT+'/detail/'+id))).val();
   FB.put=(id,o,r)=>update(ref(db,ROOT),{['detail/'+id]:o,['ringkas/'+id]:r});
   FB.del=id=>Promise.all(['detail','ringkas','presence'].map(x=>remove(ref(db,ROOT+'/'+x+'/'+id))));
   FB.top=cb=>onValue(query(ref(db,ROOT+'/ringkas'),orderByChild('xp'),limitToLast(10)),sn=>{const a=[];sn.forEach(c=>{a.push(c.val())});cb(a.filter(x=>x&&x.name).reverse())},()=>cb([]));
   FB.getPin=async()=>(await get(ref(db,ROOT+'/config/pinHash'))).val();
   FB.setPin=h=>set(ref(db,ROOT+'/config/pinHash'),h);
+  FB.adminLogin=async(em,pw,pop)=>{if(!auth)throw{code:'auth/modul-tidak-dimuat'};let r;try{r=await AU.signInWithEmailAndPassword(auth,em,pw)}catch(e){if(!pop)throw e;r=await AU.signInWithPopup(auth,new AU.GoogleAuthProvider())}return((r.user&&r.user.email)||'').toLowerCase()};
+  FB.signOut=()=>auth?AU.signOut(auth):Promise.resolve();
   FB.watch=cb=>{let u={},p={};const a=onValue(ref(db,ROOT+'/ringkas'),s=>{u=s.val()||{};cb(u,p)}),b=onValue(ref(db,ROOT+'/presence'),s=>{p=s.val()||{};cb(u,p)});return()=>{a();b()}};
   FB.presence=id=>{FB.presenceOff();const me=ref(db,ROOT+'/presence/'+id);cur=me;un=onValue(ref(db,'.info/connected'),s=>{if(s.val()===true)onDisconnect(me).set({online:false,t:serverTimestamp()}).then(()=>set(me,{online:true,t:serverTimestamp()})).catch(console.error)})};
   FB.presenceOff=()=>{if(un){un();un=null}if(cur){onDisconnect(cur).cancel();set(cur,{online:false,t:serverTimestamp()}).catch(()=>{});cur=null}};
