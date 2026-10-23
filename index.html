@@ -209,7 +209,7 @@ r=>{const d=st(r,4,20,60),mn=d[0],mx=d[3],R=mx-mn+ri(r,3,15),x=mn+R;return{q:`Da
 /* ===== BANK SOAL: build 25 soal deterministik per sub-bab × level ===== */
 const KEYS=Object.keys(G),cache={},sh=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const idOf=(k,L,n)=>{const[b,s]=k.split('.').map(Number);return`B${b+1}S${String(s+1).padStart(2,'0')}-L${L}-${String(n).padStart(3,'0')}`};
-const num=x=>{x=String(x).trim().replace(',','.');if(/^-?\d+\/\d+$/.test(x)){const[a,b]=x.split('/');return a/b}return x===''?NaN:Number(x)};
+const num=x=>{x=String(x).trim().replace(/[−–—]/g,'-').replace(',','.');if(/^-?\d+\/\d+$/.test(x)){const[a,b]=x.split('/');return a/b}return x===''?NaN:Number(x)};
 function generateQuestion({key,level,seed=0}){const r=rng(hash(key+level)+seed*977),g=G[key][level-1](r),[b,s]=key.split('.').map(Number),rs=rng(seed+7),shf=a=>a.map(x=>[rs(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
  const base={id:'',bab:B[b].n,subBab:B[b].s[s],level,pembahasan:g.e,kompetensi:'Konsep: '+B[b].s[s],tags:g.t,sumber:'generated',key,gambar:g.svg},NI='(isi dengan angka)';
  if(g.ty=='tf')return{...base,tipe:'true_false',pertanyaan:g.q,pilihan:['Benar','Salah'],jawaban:g.a?'Benar':'Salah'};
@@ -309,9 +309,10 @@ const shown=(q,a)=>a==null?'(kosong)':q.tipe=='numeric'?a:q.tipe=='matching'?a.m
 const corr=q=>q.tipe=='numeric'?q.jawaban:q.tipe=='matching'?q.pairs.map(p=>p[0]+' → '+p[1]).join('; '):'ABCD'[q.pilihan.indexOf(q.jawaban)]+'. '+q.jawaban;
 const TL={multiple_choice:'Pilihan ganda',true_false:'Benar / Salah',numeric:'Isian angka',matching:'Menjodohkan'};
 function body(q,a,ans,ex){const done=a!=null,bd=ok=>`2px solid ${done&&!ex?(ok?'var(--g)':'var(--r)'):'var(--ln)'}`,st='background:var(--card);color:var(--ink);font:700 1rem Nunito';
- if(q.tipe=='numeric')return`<input id=nv inputmode=decimal autocomplete=off placeholder="Ketik jawaban (angka)" value="${done?a:''}" ${done?'disabled':''} onkeydown="if(event.key=='Enter')subN()" style="width:100%;padding:12px;border-radius:14px;border:${bd(isOk(q,a))};${st};font-size:1.2rem;margin-bottom:10px">${done?'':'<button class=btn onclick="subN()">Periksa jawaban</button>'}`;
+ if(q.tipe=='numeric')return`<div class=row style="flex-wrap:nowrap;margin-bottom:10px">${done?'':'<button type=button class="btn s" aria-label="Tambah atau hapus tanda negatif" title="Tanda negatif (−)" onclick="negN()" style="flex:none;width:54px;height:54px;padding:0;font-size:1.5rem;line-height:50px">−</button>'}<input id=nv inputmode=decimal autocomplete=off placeholder="Ketik jawaban (angka)" value="${done?a:''}" ${done?'disabled':''} onkeydown="if(event.key=='Enter')subN()" style="flex:1;min-width:0;width:100%;padding:12px;border-radius:14px;border:${bd(isOk(q,a))};${st};font-size:1.2rem"></div>${done?'':'<button class=btn onclick="subN()">Periksa jawaban</button>'}`;
  if(q.tipe=='matching')return q.pairs.map((p,i)=>`<div class=row style="margin-bottom:8px"><span style="flex:1;min-width:150px">${p[0]}</span><select id=mt${i} ${done?'disabled':''} style="flex:1;min-width:150px;padding:10px;border-radius:12px;border:${bd(done&&a[i]==p[1])};${st}"><option value="">Pilih…</option>${q.pilihan.map(o=>`<option ${done&&a[i]==o?'selected':''}>${o}</option>`).join('')}</select></div>`).join('')+(done?'':'<button class=btn onclick="subM()">Periksa jawaban</button>');
  return q.pilihan.map((o,j)=>`<button class="opt ${ans?(o==q.jawaban?'ok':j==a?'no':''):a==j?'sel':''}" onclick="pick(${j})">${'ABCD'[j]}. ${o}</button>`).join('')}
+function negN(){const e=$('#nv');if(!e||e.disabled)return;const v=e.value.trim().replace(/^[−–—]/,'-');e.value=v.startsWith('-')?v.slice(1):'-'+v;e.focus();const l=e.value.length;try{e.setSelectionRange(l,l)}catch(_){}}
 function subN(){const v=$('#nv').value.trim();if(v==''||isNaN(num(v)))return toast('Isi dengan angka dulu ya');pick(v)}
 function subM(){const v=P.qs[P.i].pairs.map((p,i)=>$('#mt'+i).value);if(v.includes(''))return toast('Pasangkan semua dulu ya');pick(v)}
 const ADMIN='ysril852@gmail.com';
